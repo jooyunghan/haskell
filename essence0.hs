@@ -1,6 +1,5 @@
+import Text.ParserCombinators.Parsec
 import Control.Monad;
-
-module Essence where
 
 data M a = Success a | Error String
 
@@ -59,4 +58,45 @@ apply f a = return Wrong
 
 test :: Term -> String
 test t = showM (interp t [])
+
+;;; 
+
+term :: Parser Term
+term = try addp <|> cons <|> var <|> lamb <|> try appl <|> do 
+	char '('
+	t <- term
+	char ')'
+	return t
+
+addp :: Parser Term
+addp = chainl1 term (char '+' >> return Add)
+
+cons :: Parser Term
+cons = do 
+	ds <- many1 digit
+	return (Con (read ds))
+
+name :: Parser Name
+name = many1 letter
+
+var :: Parser Term
+var = do
+	n <- name
+	return (Var n)
+
+lamb :: Parser Term
+lamb = do
+	char '\\'
+	n <- name
+	string "->"
+	t <- term
+	return (Lam n t)
+
+appl :: Parser Term
+appl = chainl1 term (return App)
+
+eval :: String -> String 
+eval input = case (parse term "" input) of
+	Left err -> "Error : " ++ show err
+	Right x -> test x
 

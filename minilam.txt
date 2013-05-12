@@ -1,0 +1,27 @@
+term =
+	lambda
+	| application
+	| var
+  | const
+	| add
+	| paren
+
+add = // left-recursive
+	term + term
+
+lambda =
+	\ var -> term
+
+application =
+	term term
+	
+
+var =
+  word (= letter+)
+
+const
+	digit+
+
+
+(\x->x+x)
+
