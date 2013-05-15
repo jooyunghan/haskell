@@ -61,10 +61,13 @@ test t = showM (interp t [])
 
 ;;; 
 
+lang :: Parser Term
+lang = try addp <|> appl
+
 term :: Parser Term
-term = try addp <|> cons <|> var <|> lamb <|> try appl <|> do 
+term = cons <|> var <|> lamb <|> do 
 	char '('
-	t <- term
+	t <- lang
 	char ')'
 	return t
 
@@ -89,7 +92,7 @@ lamb = do
 	char '\\'
 	n <- name
 	string "->"
-	t <- term
+	t <- lang
 	return (Lam n t)
 
 appl :: Parser Term
