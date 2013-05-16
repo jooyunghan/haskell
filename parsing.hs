@@ -44,6 +44,9 @@ digit = sat isDigit
 
 isDigit x = elem x "0123456789"
 
+digitToInt :: Char -> Int
+digitToInt = read . (:[])
+
 many :: Parser a -> Parser [a]
 many p = many1 p +++ return' []
 
@@ -60,3 +63,38 @@ string (x:xs) = char x `bind` \_ ->
 
 char :: Char -> Parser Char
 char x = sat (== x)
+
+
+-- arithmetic expression
+-- operators are right associative
+
+expr :: Parser Int
+expr = term `bind` \t ->
+       (char '+' `bind` \_ ->
+             expr `bind` \e ->
+             return' (t + e))
+       +++ (char '-' `bind` \_ ->
+             expr `bind` \e ->
+             return' (t - e))
+       +++ return' t
+
+term :: Parser Int
+term = factor `bind` \f ->
+       (char '*' `bind` \_ ->
+             term `bind` \t ->
+             return' (f * t))
+       +++ (char '/' `bind` \_ ->
+             term `bind` \t ->
+             return' (f `div` t))
+       +++ return' f
+
+factor :: Parser Int
+factor = (digit `bind` \d ->
+          return' (digitToInt d))
+         +++ (char '(' `bind` \_ ->
+              expr `bind` \e ->
+              char ')' `bind` \_ ->
+              return' e)
+
+eval :: String -> Int
+eval = fst . head . parse expr
