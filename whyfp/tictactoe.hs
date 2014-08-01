@@ -2,6 +2,7 @@
 
 import qualified Data.Map as  M
 import Tree
+import Minimax
 
 data Cell = Cross | Naught | Empty deriving (Eq, Show)
 
@@ -69,9 +70,6 @@ moves :: Position -> [Position]
 moves p =  M.elems $ uniqMap normalValue $ fill p
 	where uniqMap keyFun list = M.fromListWith (\a -> id) [(keyFun v, v) | v <- list]
 
-gametree :: Position -> Tree Position
-gametree = reptree moves
-
 
 -- Computer is Naught
 -- static evaluates the current position as 1 for winning, -1 for losing, 0 otherwise
@@ -81,20 +79,6 @@ static p = case winner p of
 	Naught -> 1
 	otherwise -> 0
 
-maximize (Node n []) = n
-maximize (Node n sub) = foldl1 max (map minimize sub)
-minimize (Node n []) = n
-minimize (Node n sub) = foldl1 min (map maximize sub)
-
--- dynamic evaluator
-evaluate :: Position -> Int
-evaluate = maximize . maptree static . gametree
-
-aimove :: Position -> Position
-aimove p = maxkey [(evaluate' move, move)| move <- moves p]
-	where
-		evaluate' = minimize . maptree static . prune 5 . gametree
-		maxkey = snd . foldl1 (\(k1,v1) (k2,v2) -> if k1 > k2 then (k1,v1) else (k2,v2))
 
 winner :: Position -> Cell
 winner (a,b,c,d,e,f,g,h,i) 
@@ -112,9 +96,6 @@ end :: Position -> Bool
 end p = winner p /= Empty || count p Empty == 0
 
 
-prune 0 (Node a _) = Node a []
-prune n (Node a sub) = Node a (map (prune (n-1)) sub)
-
 
 -- game driver
 
@@ -125,6 +106,9 @@ player p = do
 	input <- getLine
 	return $ update p (read input) Cross
 
+
+aimove' = aimove moves static
+
 loop :: Position -> IO ()
 loop p = do
 	m <- player p
@@ -134,7 +118,7 @@ loop p = do
 		else if end m 
 			then putStrLn "Draw"
 			else 
-				let m2 = aimove m in if winner m == Naught 
+				let m2 = aimove' m in if winner m == Naught 
 					then putStrLn "I win"
 					else if end m2
 						then putStrLn "Draw"
