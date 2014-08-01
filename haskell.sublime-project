@@ -1,0 +1,11 @@
+{
+	"folders":
+	[
+		{
+			"follow_symlinks": true,
+			"path": "/Users/jooyunghan/work/haskell",
+			"file_exclude_patterns": ["*.hi", "*~"],
+			"folder_exclude_patterns": ["bin"],
+		}
+	]
+}
