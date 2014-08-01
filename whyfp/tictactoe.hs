@@ -1,4 +1,4 @@
-
+module Main (main) where
 
 import qualified Data.Map as  M
 import Tree
