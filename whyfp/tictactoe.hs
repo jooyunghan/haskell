@@ -1,4 +1,7 @@
+
+
 import qualified Data.Map as  M
+import Tree
 
 data Cell = Cross | Naught | Empty deriving (Eq, Show)
 
@@ -108,13 +111,6 @@ winner (a,b,c,d,e,f,g,h,i)
 end :: Position -> Bool
 end p = winner p /= Empty || count p Empty == 0
 
-data Tree n = Node n [Tree n]
-
-reptree :: (a -> [a]) -> a -> Tree a
-reptree f a = Node a (map (reptree f) (f a))
-
-maptree :: (a -> b) -> Tree a -> Tree b
-maptree f (Node a subs) = Node (f a) (map (maptree f) subs)
 
 prune 0 (Node a _) = Node a []
 prune n (Node a sub) = Node a (map (prune (n-1)) sub)
