@@ -90,7 +90,7 @@ evaluate = maximize . maptree static . gametree
 aimove :: Position -> Position
 aimove p = maxkey [(evaluate' move, move)| move <- moves p]
 	where
-		evaluate' = minimize . maptree static . gametree
+		evaluate' = minimize . maptree static . prune 5 . gametree
 		maxkey = snd . foldl1 (\(k1,v1) (k2,v2) -> if k1 > k2 then (k1,v1) else (k2,v2))
 
 winner :: Position -> Cell
@@ -115,6 +115,12 @@ reptree f a = Node a (map (reptree f) (f a))
 
 maptree :: (a -> b) -> Tree a -> Tree b
 maptree f (Node a subs) = Node (f a) (map (maptree f) subs)
+
+prune 0 (Node a _) = Node a []
+prune n (Node a sub) = Node a (map (prune (n-1)) sub)
+
+
+-- game driver
 
 player :: Position -> IO (Position)
 player p = do
