@@ -20,9 +20,6 @@ render (a,b,c,d,e,f,g,h,i) = unlines [map to_char row | row <- [[a,b,c],[d,e,f],
 to_list :: Position -> [Cell]
 to_list (a,b,c,d,e,f,g,h,i) = a:b:c:d:e:f:g:h:i:[]
 
-moves :: Position -> [Position]
-moves p =  M.elems $ uniqMap normalValue $ fill p
-	where uniqMap keyFun list = M.fromListWith (\a -> id) [(keyFun v, v) | v <- list]
 
 -- find minimum value among 8 variations of current Position
 normalValue :: Position -> Int
@@ -64,6 +61,82 @@ next_turn p = if count p Cross == count p Naught then Cross else Naught
 count :: Position -> Cell -> Int
 count p c = length $ filter (== c) $ to_list p
 
-main = do
-	putStrLn . unlines . map render . moves . last . moves $ start
-	putStrLn "Hello World"
+
+moves :: Position -> [Position]
+moves p =  M.elems $ uniqMap normalValue $ fill p
+	where uniqMap keyFun list = M.fromListWith (\a -> id) [(keyFun v, v) | v <- list]
+
+gametree :: Position -> Tree Position
+gametree = reptree moves
+
+
+-- Computer is Naught
+-- static evaluates the current position as 1 for winning, -1 for losing, 0 otherwise
+static :: Position -> Int
+static p = case winner p of
+	Cross -> -1
+	Naught -> 1
+	otherwise -> 0
+
+maximize (Node n []) = n
+maximize (Node n sub) = foldl1 max (map minimize sub)
+minimize (Node n []) = n
+minimize (Node n sub) = foldl1 min (map maximize sub)
+
+-- dynamic evaluator
+evaluate :: Position -> Int
+evaluate = maximize . maptree static . gametree
+
+aimove :: Position -> Position
+aimove p = maxkey [(evaluate' move, move)| move <- moves p]
+	where
+		evaluate' = minimize . maptree static . gametree
+		maxkey = snd . foldl1 (\(k1,v1) (k2,v2) -> if k1 > k2 then (k1,v1) else (k2,v2))
+
+winner :: Position -> Cell
+winner (a,b,c,d,e,f,g,h,i) 
+	| a == b && b == c && a /= Empty = a
+	| d == e && e == f && d /= Empty = d 
+	| g == h && h == i && g /= Empty = g
+	| a == d && d == g && a /= Empty = a
+	| b == e && e == h && b /= Empty = b
+	| c == f && f == i && c /= Empty = c
+	| a == e && e == i && a /= Empty = a
+	| c == e && e == g && c /= Empty = c
+	| otherwise = Empty
+
+end :: Position -> Bool
+end p = winner p /= Empty || count p Empty == 0
+
+data Tree n = Node n [Tree n]
+
+reptree :: (a -> [a]) -> a -> Tree a
+reptree f a = Node a (map (reptree f) (f a))
+
+maptree :: (a -> b) -> Tree a -> Tree b
+maptree f (Node a subs) = Node (f a) (map (maptree f) subs)
+
+player :: Position -> IO (Position)
+player p = do
+	putStrLn $ render p
+	putStrLn "Your move(0~8):"
+	input <- getLine
+	return $ update p (read input) Cross
+
+loop :: Position -> IO ()
+loop p = do
+	m <- player p
+	putStrLn $ render m
+	if winner m == Cross 
+		then putStrLn "You win" 
+		else if end m 
+			then putStrLn "Draw"
+			else 
+				let m2 = aimove m in if winner m == Naught 
+					then putStrLn "I win"
+					else if end m2
+						then putStrLn "Draw"
+						else loop m2
+
+		
+main = loop start
