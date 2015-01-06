@@ -48,4 +48,25 @@ isPalindrome :: String -> Bool
 isPalindrome xs = ys == reverse ys
   where ys = map toLower (filter isAlpha xs)
 
-main = palindrome
+-- main = palindrome
+
+-- Ch 4 Exercise B
+-- All pairs 
+
+allPairs = [(a, d-a) | d <- [0..], a <- [0..d]]
+
+-- Ch 4 Exercise E 
+-- a^3 + b^3 == c^3 + d^3
+-- 0 < a,b,c,d <= n
+
+-- allPairs' = [(a, s-a) | s <- [2..], a <- [1..s `div` 2]]
+
+quadruples n = [(a,b,c,d) | a <- [1..n], b <- [a..n], c <- [a+1..n], d <- [c..n], a^3 + b^3 == c^3 + d^3]
+
+-- quads = [(a,b,c,d) | (a,b) <- allPairs', (c,d) <- pairCubeSum (a^3 + b^3)]
+--   where pairCubeSum 
+
+
+
+
+
