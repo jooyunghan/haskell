@@ -20,29 +20,29 @@ solution =  ["796854321",
 			"582341697",
 			"379682154"]
 
-class Backtrackable m where
-	valid :: m -> Bool
-	completed :: m -> Bool
-	next :: m -> [m]
+--class Backtrackable m where
+--	valid :: m -> Bool
+--	completed :: m -> Bool
+--	next :: m -> [m]
 
-solve :: (Backtrackable m) => m -> [m]
-solve m
-	| not (valid m) = []                -- has dup
-	| completed m = [m]                 -- no dup, no blank => this is a solution
-	| otherwise   = next m >>= solve    -- no dup, has blank => keep searching
+--solve :: (Backtrackable m) => m -> [m]
+--solve m
+--	| not (valid m) = []                -- has dup
+--	| completed m = [m]                 -- no dup, no blank => this is a solution
+--	| otherwise   = next m >>= solve    -- no dup, has blank => keep searching
 
 type Digit = Char
 type Matrix a = [[a]]
 
-newtype Sudoku = Sudoku (Matrix Digit) deriving (Eq, Show)
+--newtype Sudoku = Sudoku (Matrix Digit) deriving (Eq, Show)
 
-instance Backtrackable Sudoku where
-	valid (Sudoku m) = all ok (rows m ++ cols m ++ boxes m)
-	completed (Sudoku m) = all (not . blank) (concat m)
-	next (Sudoku m) = map Sudoku [rows0 ++  (cells0 ++ d:cells1):rows1| d <- ['1'..'9']]
-		where
-			(rows0, row:rows1) = break (any blank) m
-			(cells0, cell:cells1) = break blank row
+--instance Backtrackable Sudoku where
+--	valid (Sudoku m) = all ok (rows m ++ cols m ++ boxes m)
+--	completed (Sudoku m) = all (not . blank) (concat m)
+--	next (Sudoku m) = map Sudoku [rows0 ++  (cells0 ++ d:cells1):rows1| d <- ['1'..'9']]
+--		where
+--			(rows0, row:rows1) = break (any blank) m
+--			(cells0, cell:cells1) = break blank row
 
 ok = nodups . filter (not . blank)
 nodups cells = length cells == length (nub cells)
@@ -56,4 +56,39 @@ ungroup = concat
 group [] = []
 group xs = take 3 xs : group (drop 3 xs)
 
-main = print $ solve (Sudoku easy)
+
+type Grid = Matrix Digit
+
+digits = ['1'..'9']
+
+expand1 :: Grid -> [Grid]
+expand1 m = if completed m then [] else [rows0 ++  (cells0 ++ d:cells1):rows1| d <- digits]
+		where
+			(rows0, row:rows1) = break (any blank) m
+			(cells0, cell:cells1) = break blank row
+
+safe :: Grid -> Bool
+safe m = all ok (rows m ++ cols m ++ boxes m)
+
+completed :: Grid -> Bool
+completed m = all (not . blank) (concat m)
+
+solve2 :: Grid -> [Grid]
+solve2 = filter safe . leaves . prunetree safe . repeattree expand1
+
+main = print $ solve2 easy
+
+
+
+data Node a = Node a [Node a] deriving (Eq, Show)
+
+repeattree :: (a -> [a]) -> a -> Node a
+repeattree f a = Node a (map (repeattree f) (f a))
+
+leaves :: Node a -> [a]
+leaves (Node a []) = [a]
+leaves (Node a children) = concat (map leaves children)
+
+prunetree :: (a -> Bool) -> Node a -> Node a
+prunetree p (Node a children) = if p a then Node a (map (prunetree p) children) else Node a []
+
