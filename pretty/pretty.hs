@@ -42,28 +42,55 @@ pretty :: Int -> Doc -> String
 pretty = undefined
 
 layouts :: Doc -> [Layout]
-layouts = undefined
+layouts = id
 
 nil :: Doc
-nil = undefined
+nil = [""]
 
 line :: Doc
-line = undefined
+line = ["\n"]
 
 text :: String -> Doc
-text = undefined
+text = (:[])
 
 (<>) :: Doc -> Doc -> Doc
-(<>) = undefined
+(<>) = (<++>)
 
 nest :: Int -> Doc -> Doc
-nest = undefined
+nest i = map (nestl i)
 
 group :: Doc -> Doc
-group = undefined
+group x = flatten x ++ x
 
 flatten :: Doc -> Doc
-flatten = undefined
+flatten x = [flattenl (head x)]
+
+---
+
+xs <++> ys = [x++y | x<-xs, y<-ys]
+
+nestl i xs = concat [p x | x<-xs]
+ where p x = if x == '\n' then '\n':replicate i ' ' else [x]
+
+flattenl [] = []
+flattenl (x:xs) = if x == '\n' then ' ' : flattenl (dropWhile (==' ') xs) else x : flattenl xs
+
+---
+
+shape :: Layout -> [Int]
+shape = map length . lines
+
+-- Conditional expression --
+
+data CExpr = Expr String | If String CExpr CExpr
+
+cexpr :: CExpr -> Doc
+cexpr (Expr s) = text s
+cexpr (If p e1 e2) = group (group (text ("if " ++ p) <> line
+             <> text "then " <> nest 5 (cexpr e1)) <> line
+             <> text "else " <> nest 5 (cexpr e2))
+
+c1 = If "wealthy" (If "happy" (Expr "lucky you") (Expr "tough")) (If "in love" (Expr "content") (Expr "miserable"))
 
 
 -- GenTree --
@@ -85,6 +112,7 @@ Node a
    c]
 -}
 
+t1 = Node 1[Node 2[Node 7 [], Node 8[]], Node 3[Node 9[Node 10[], Node 11[]]], Node 4[], Node 5[Node 6[]]]
 
 -- Paragraph --
 para :: String -> Doc
@@ -101,5 +129,6 @@ pg = "This is a pretty-printer written in Haskell.\n\
 
 
 main = do
-  putStrLn $ pretty 30 $ para pg
+    print $ map shape $ layouts $ cexpr c1
+--  putStrLn $ pretty 30 $ para pg
 
