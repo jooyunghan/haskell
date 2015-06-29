@@ -3,6 +3,7 @@
 *.hi
 *.o
 *.hs#
+*.class
 
 
 *.swp
