@@ -1,0 +1,15 @@
+
+*.hs~
+*.hi
+*.o
+*.hs#
+
+
+*.swp
+
+
+bin/
+
+
+*.sublime-workspace
+
