@@ -66,6 +66,8 @@ flatten :: Doc -> Doc
 flatten = undefined
 
 
+
+
 -- GenTree --
 data GenTree a = Node a [GenTree a]
 
@@ -101,5 +103,9 @@ pg = "This is a pretty-printer written in Haskell.\n\
 
 
 main = do
+<<<<<<< Updated upstream
+=======
+--    print $ map shape $ layouts $ cexpr c1
+>>>>>>> Stashed changes
   putStrLn $ pretty 30 $ para pg
 

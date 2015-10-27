@@ -14,3 +14,6 @@ bin/
 
 *.sublime-workspace
 
+dist/
+TAGS
+
