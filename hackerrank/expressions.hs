@@ -35,25 +35,27 @@ factor = number
 number :: ReadP Expr
 number = Term . read <$> (skipSpaces >> many1 (satisfy isDigit))
 
-p :: Int
 p = 10 ^ 9 + 7
 
-eval :: Expr -> Int
 eval (Term n) = n
 eval (Neg e) = negate $ eval e
-eval (Add e1 e2) = eval e1 + eval e2
-eval (Sub e1 e2) = eval e1 - eval e2
-eval (Div e1 e2) = let a = eval e1
-                       b = eval e2
-                   in if a >= b then a `div` b
-                      else a * (pow' b (p - 2) `mod` p)
-eval (Mul e1 e2) = eval e1 * eval e2
+eval (Add e1 e2) = eval e1 `madd` eval e2
+eval (Sub e1 e2) = eval e1 `msub` eval e2
+eval (Div e1 e2) = eval e1 `mdiv` eval e2
+eval (Mul e1 e2) = eval e1 `mmul` eval e2
 
-pow' :: Int -> Int -> Int
-pow' a b
-  | b == 0 = 1
-  | even b =  pow' (pow' a (b `div` 2)) 2 `mod` p
-  | otherwise = (pow' (pow' a ((b-1) `div` 2)) 2) * a `mod` p
+madd a b = (a+b) `mod` p
+
+msub a b = (a-b) `mod` p
+
+mmul a b = (a*b) `mod` p
+
+mdiv a b = rec a b (p - 2)
+
+rec a b e
+  | e == 0 = a
+  | even e = rec a (mmul b b) (e `div` 2)
+  | otherwise = rec (mmul a b) (mmul b b) (e `div` 2)
 
 main :: IO()
-main = getLine >>= print . (`mod` p) . eval . read
+main = getLine >>= print . eval . read
