@@ -76,10 +76,11 @@ query (BinTree left root right) (x:xs)
 main = do rule <- getLine >>= return. read
           tree <- getLine >>= return. read
           n <- getLine >>= return. read
-          loop rule tree n
+          loop rule tree n 0
           where loop :: Rule -> BinTree Cell -> Int -> IO ()
-                loop _ _ 0 = return ()
-                loop r t n = do q <- getLine >>= return. read
-                                let t' = runCA r t (steps q)
-                                putStrLn $ show $ query t' (path q)
-                                loop r t' (n-1)
+                loop _ _ 0 _ = return ()
+                loop r t n s = do q <- getLine >>= return. read
+                                  let s' = (steps q) + s
+                                  let t' = 
+                                  putStrLn $ show $ query t' (path q)
+                                  loop r t' (n-1)
