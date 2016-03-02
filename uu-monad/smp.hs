@@ -3,15 +3,18 @@
 
 import Control.Monad
 import Data.Monoid
-import Data.Map
+import Data.Map (Map,empty,toList,insertWith)
 import Data.List
 import Control.Monad.State
+import Control.Monad.Except
+import Control.Exception (catch)
 
 type Stack a = [a]
 push :: a -> Stack a -> Stack a
 push = (:)
 top = head
 pop = tail
+isEmpty = null
 
 data Diagnostics s = Diagnostics {unD :: Map String Int, stack :: Stack s} deriving Show
 
@@ -26,14 +29,17 @@ addDiagnostics = add "diagnostics"
 showDiagnostics d = "[" ++ (intercalate ", " . fmap f . toList . unD $ d) ++ "]"
                     where f (s,n) = s ++ "=" ++ show n
 
-data StateMonadPlus s a = SMP {runSMP :: (Diagnostics s, s) -> (Diagnostics s, Either String (a,s))}
+newtype StateMonadPlus s a =  SMP {runSMP :: StateT (Diagnostics s) (StateT s (Except String)) a}
 
 diagnostics :: StateMonadPlus s String
-diagnostics = SMP $ \(d,s) -> let d' = addDiagnostics d
-                              in (d', Right (showDiagnostics d', s))
-
+diagnostics = SMP $ do
+  modify (add "diag")
+  showDiagnostics <$> get
+  
 annotate :: String -> StateMonadPlus s a -> StateMonadPlus s a
-annotate label m = SMP $ \(d,s) -> runSMP m (add label d, s)
+annotate label m = SMP $ do
+  modify (add label)
+  runSMP m
 
 instance Functor (StateMonadPlus s) where
   fmap = liftM
@@ -43,16 +49,29 @@ instance Applicative (StateMonadPlus s) where
   (<*>) = ap
 
 instance Monad (StateMonadPlus s) where
-  return a = SMP $ \(d, s) -> (addReturn d,  Right (a, s))
-  m >>= f = SMP $ \(d, s) -> let (d', result) = runSMP m (addBind d, s)
-                             in case result of
-                             Left err -> (d', Left err)
-                             Right (a, s') -> runSMP (f a) (d', s')
-  fail msg = SMP $ \(d, _) -> (add "fail" d, Left msg)
+  return a = SMP $ do
+    modify (add "return")
+    return a
+  m >>= f = SMP $ do
+    modify (add "bind")
+    a <- runSMP m
+    runSMP (f a)
+
+data Hole = Hole
 
 instance MonadState s (StateMonadPlus s) where
-  get = SMP $ \(d,s) -> (add "get" d, Right (s, s))
-  put s = SMP $ \(d,_) -> (add "put" d, Right ((), s))
+  put s = SMP $ do
+    modify (add "put")
+    lift.put $ s
+  get = SMP $ do
+    modify (add "get")
+    lift get
+
+instance MonadError String (StateMonadPlus s) where
+  throwError s = SMP $ do
+    lift $ throwError s
+  catchError m handler = SMP $ do
+    catchError (runSMP m) (runSMP . handler)
 
 e1 = do return 3 >> return 4
         return 5
@@ -62,9 +81,11 @@ e2 = do annotate "A" (return 3 >> return 4)
         return 5
         diagnostics
 
-runStateMonadPlus :: StateMonadPlus s a -> s -> Either String (a, s)
-runStateMonadPlus m s = snd $ runSMP m (emptyD, s)
+e2' :: StateMonadPlus s a
+e2' = throwError "hell"
 
+runStateMonadPlus :: StateMonadPlus s a -> s -> Either String (a, s)
+runStateMonadPlus m s = runExcept $ (runStateT ( evalStateT (runSMP m) emptyD ) s)
 
 class MonadState s m => StoreState s m|m->s where
   saveState :: m ()
@@ -80,6 +101,18 @@ e3 = do i1<-get;saveState
         i5<-get
         return (i1,i2,i3,i4,i5)
 
+e3' :: (StoreState s m) => m()
+e3' = get >> loadState
+
 instance StoreState s (StateMonadPlus s) where
-  saveState = SMP $ \(d,s) -> (d {stack = push s (stack d)}, Right((),s))
-  loadState = SMP $ \(d,s) -> (d {stack = pop (stack d)}, Right((), top (stack d)))
+  saveState = SMP $ do
+    modify (add "save")
+    s <- lift get
+    d <- get
+    put $ d{stack= push s (stack d)}
+  loadState = SMP $ do
+    modify (add "load")
+    d <- get
+    when (isEmpty $ stack d) (throwError "empty stack")
+    lift.put $ top.stack $ d
+    modify (\d -> d{stack= pop (stack d)})
