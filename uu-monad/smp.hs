@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
@@ -9,36 +11,31 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Exception (catch)
 
+data Diagnostics s = Diagnostics {unD :: Map String Int} deriving Show
+emptyD = Diagnostics empty
+
+add :: String -> Diagnostics s -> Diagnostics s
+add label d = d {unD = insertWith (+) label 1 $ unD d}
+
+showDiagnostics d = "[" ++ (intercalate ", " . fmap f . toList . unD $ d) ++ "]"
+                    where f (s,n) = s ++ "=" ++ show n
+
 type Stack a = [a]
-push :: a -> Stack a -> Stack a
 push = (:)
 top = head
 pop = tail
 isEmpty = null
 
-data Diagnostics s = Diagnostics {unD :: Map String Int, stack :: Stack s} deriving Show
-
-emptyD = Diagnostics empty []
-
-add :: String -> Diagnostics s -> Diagnostics s
-add label d = d {unD = insertWith (+) label 1 $ unD d}
-addBind = add "bind"
-addReturn = add "return"
-addDiagnostics = add "diagnostics"
-
-showDiagnostics d = "[" ++ (intercalate ", " . fmap f . toList . unD $ d) ++ "]"
-                    where f (s,n) = s ++ "=" ++ show n
-
-newtype StateMonadPlus s a =  SMP {runSMP :: StateT (Diagnostics s) (StateT s (Except String)) a}
+newtype StateMonadPlus s a =  SMP {runSMP :: StateT (Stack s) (StateT (Diagnostics s) (StateT s (Except String))) a}
 
 diagnostics :: StateMonadPlus s String
 diagnostics = SMP $ do
-  modify (add "diag")
-  showDiagnostics <$> get
+  diag "diag"
+  showDiagnostics <$> (lift get)
   
 annotate :: String -> StateMonadPlus s a -> StateMonadPlus s a
 annotate label m = SMP $ do
-  modify (add label)
+  diag label
   runSMP m
 
 instance Functor (StateMonadPlus s) where
@@ -50,10 +47,10 @@ instance Applicative (StateMonadPlus s) where
 
 instance Monad (StateMonadPlus s) where
   return a = SMP $ do
-    modify (add "return")
+    diag "return"
     return a
   m >>= f = SMP $ do
-    modify (add "bind")
+    diag "bind"
     a <- runSMP m
     runSMP (f a)
 
@@ -61,11 +58,11 @@ data Hole = Hole
 
 instance MonadState s (StateMonadPlus s) where
   put s = SMP $ do
-    modify (add "put")
-    lift.put $ s
+    diag "put"
+    lift.lift.put $ s
   get = SMP $ do
-    modify (add "get")
-    lift get
+    diag "get"
+    lift.lift $ get
 
 instance MonadError String (StateMonadPlus s) where
   throwError s = SMP $ do
@@ -85,7 +82,7 @@ e2' :: StateMonadPlus s a
 e2' = throwError "hell"
 
 runStateMonadPlus :: StateMonadPlus s a -> s -> Either String (a, s)
-runStateMonadPlus m s = runExcept $ (runStateT ( evalStateT (runSMP m) emptyD ) s)
+runStateMonadPlus m s = runExcept $ (runStateT (evalStateT (evalStateT (runSMP m) []) emptyD) s)
 
 class MonadState s m => StoreState s m|m->s where
   saveState :: m ()
@@ -104,15 +101,16 @@ e3 = do i1<-get;saveState
 e3' :: (StoreState s m) => m()
 e3' = get >> loadState
 
+diag s = lift.modify $ add s
+
 instance StoreState s (StateMonadPlus s) where
   saveState = SMP $ do
-    modify (add "save")
-    s <- lift get
-    d <- get
-    put $ d{stack= push s (stack d)}
+    diag "save"
+    (s::s) <- lift.lift $ get
+    modify (push s)
   loadState = SMP $ do
-    modify (add "load")
-    d <- get
-    when (isEmpty $ stack d) (throwError "empty stack")
-    lift.put $ top.stack $ d
-    modify (\d -> d{stack= pop (stack d)})
+    diag "load"
+    s <- get
+    when (isEmpty s) (throwError "empty stack")
+    lift.lift.put $ top s
+    modify pop
